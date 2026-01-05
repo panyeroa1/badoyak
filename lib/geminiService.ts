@@ -93,7 +93,7 @@ export async function streamTranslation(
           }));
         },
         onmessage: async (message: LiveServerMessage) => {
-          const base64Audio = message.serverContent?.modelTurn?.parts[0]?.inlineData?.data;
+          const base64Audio = message.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
           if (base64Audio) {
             const rawData = decode(base64Audio);
             onAudioData(rawData);
@@ -109,7 +109,7 @@ export async function streamTranslation(
           }
 
           if (message.serverContent?.modelTurn?.parts?.[0]?.text) {
-             fullTranslation += message.serverContent.modelTurn.parts[0].text;
+             fullTranslation += message.serverContent.modelTurn.parts?.[0].text;
              onTranscript(fullTranslation);
           }
 
