@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { AppMode, Language, LANGUAGES, RoomState } from '@/lib/translator-types';
 import * as roomStateService from '@/lib/roomStateService';
+import { streamTranslation } from '@/lib/geminiService';
 
 interface TranslatorButtonsProps {
   userId: string;
@@ -17,7 +18,9 @@ const TranslatorButtons = ({ userId, userName }: TranslatorButtonsProps) => {
   const [showLangs, setShowLangs] = useState(false);
   const [transcription, setTranscription] = useState<string>('');
 
-  const recognitionRef = useRef<any>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const isRunningRef = useRef<boolean>(false);
   const selectedLanguageRef = useRef<Language>(LANGUAGES[0]);
 
   useEffect(() => {
@@ -33,9 +36,18 @@ const TranslatorButtons = ({ userId, userName }: TranslatorButtonsProps) => {
   const isMeSpeaking = mode === 'speaking';
   const isMeListening = mode === 'listening';
 
-  const handleSpeakToggle = useCallback(() => {
+  const handleSpeakToggle = useCallback(async () => {
     if (mode === 'speaking') {
-      if (recognitionRef.current) recognitionRef.current.stop();
+      isRunningRef.current = false;
+      if (mediaStreamRef.current) {
+        mediaStreamRef.current.getTracks().forEach(track => track.stop());
+        mediaStreamRef.current = null;
+      }
+      if (audioContextRef.current) {
+        audioContextRef.current.close();
+        audioContextRef.current = null;
+      }
+      
       setMode('idle');
       setTranscription('');
       roomStateService.releaseSpeaker(userId);
@@ -43,43 +55,71 @@ const TranslatorButtons = ({ userId, userName }: TranslatorButtonsProps) => {
       const acquired = roomStateService.tryAcquireSpeaker(userId, userName);
       if (acquired) {
         setMode('speaking');
-        setTranscription('');
-        
-        if (typeof window !== 'undefined' && 'webkitSpeechRecognition' in window) {
-          // eslint-disable-next-line new-cap
-          const SpeechRecognition = (window as any).webkitSpeechRecognition;
-          const recognition = new SpeechRecognition();
-          recognition.continuous = true;
-          recognition.interimResults = true;
-          recognition.lang = selectedLanguageRef.current.code === 'auto' 
-            ? navigator.language 
-            : selectedLanguageRef.current.code;
+        setTranscription('Initializing transcription...');
+        isRunningRef.current = true;
+
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          mediaStreamRef.current = stream;
+          const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+          audioContextRef.current = audioCtx;
+
+          // Note: In a real implementation, we would hook up speech-to-text here 
+          // or send audio chunks to Gemini. For this demo integration, we are calling 
+          // streamTranslation which is expecting text input in the original code,
+          // but we canadapt logic or use speech recognition as a bridge.
+          // 
+          // Given the current geminiService logic (text-to-speech-translation),
+          // let's keep the speech recognition for input, and use Gemini for output (if that was the intent)
+          // OR if streamTranslation supports audio input (the updated one does via 'turn'?), 
+          // let's re-examine geminiService.ts. 
+          //
+          // Wait, the geminiService.ts I copied uses:
+          // sessionPromise.then(s => s.sendClientContent({ turns: [{ parts: [{ text: sourceText }] }] }));
+          // It sends TEXT. So we need Speech-to-Text first.
           
-          recognition.onresult = (event: any) => {
-            let interimTranscript = '';
-            let finalTranscript = '';
-            
-            for (let i = event.resultIndex; i < event.results.length; ++i) {
-              if (event.results[i].isFinal) {
-                finalTranscript += event.results[i][0].transcript;
-              } else {
-                interimTranscript += event.results[i][0].transcript;
-              }
-            }
-            
-            // Show current transcription
-            setTranscription(finalTranscript || interimTranscript);
-          };
-          
-          recognition.onerror = (event: any) => {
-            console.error('Speech recognition error:', event.error);
-            setTranscription(`Error: ${event.error}`);
-          };
-          
-          recognition.start();
-          recognitionRef.current = recognition;
-        } else {
-          setTranscription('Speech recognition not supported in this browser');
+          if (typeof window !== 'undefined' && 'webkitSpeechRecognition' in window) {
+              // eslint-disable-next-line new-cap
+              const SpeechRecognition = (window as any).webkitSpeechRecognition;
+              const recognition = new SpeechRecognition();
+              recognition.continuous = true;
+              recognition.interimResults = true;
+              recognition.lang = selectedLanguageRef.current.code === 'auto' 
+                ? navigator.language 
+                : selectedLanguageRef.current.code;
+              
+              recognition.onresult = (event: any) => {
+                let finalTranscript = '';
+                for (let i = event.resultIndex; i < event.results.length; ++i) {
+                  if (event.results[i].isFinal) {
+                    finalTranscript += event.results[i][0].transcript;
+                  }
+                }
+                
+                if (finalTranscript && isRunningRef.current) {
+                  setTranscription(`Translating: ${finalTranscript}`);
+                  // Send to Gemini for translation and speech output
+                   streamTranslation(
+                      finalTranscript,
+                      selectedLanguageRef.current.name,
+                      audioCtx,
+                      (data) => { /* handle audio data visualization if needed */ },
+                      (text) => setTranscription(text),
+                      () => { /* interaction ended */ },
+                      navigator.language
+                   );
+                }
+              };
+              
+              recognition.start();
+              // Store recognition to stop it later
+              (mediaStreamRef as any).recognition = recognition; 
+          }
+
+        } catch (err) {
+          console.error("Error accessing microphone:", err);
+          setMode('idle');
+          setTranscription('Error accessing microphone');
         }
       }
     }
@@ -109,8 +149,7 @@ const TranslatorButtons = ({ userId, userName }: TranslatorButtonsProps) => {
       {/* Transcription display - 15px above buttons */}
       {transcription && (
         <div 
-          className="absolute w-[400px] max-w-[90vw] text-center"
-          style={{ bottom: 'calc(100% + 15px)' }}
+          className="absolute bottom-[calc(100%+15px)] w-[400px] max-w-[90vw] text-center"
         >
           <span className="inline-block max-w-full truncate rounded-[8px] bg-[#1c1f2e]/90 px-4 py-2 text-sm text-white shadow-lg">
             {transcription}
