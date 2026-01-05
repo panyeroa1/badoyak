@@ -17,22 +17,27 @@ const EndCallButton = () => {
   // https://getstream.io/video/docs/react/guides/call-and-participant-state/#participant-state-3
   const { useLocalParticipant } = useCallStateHooks();
   const localParticipant = useLocalParticipant();
+  if (!localParticipant) return null;
 
   const isMeetingOwner =
-    localParticipant &&
     call.state.createdBy &&
     localParticipant.userId === call.state.createdBy.id;
 
-  if (!isMeetingOwner) return null;
-
-  const endCall = async () => {
-    await call.endCall();
+  const handleExit = async () => {
+    if (isMeetingOwner) {
+      await call.endCall();
+    } else {
+      await call.leave();
+    }
     router.push('/');
   };
 
   return (
-    <Button onClick={endCall} className="bg-red-500">
-      End call for everyone
+    <Button 
+      onClick={handleExit} 
+      className="rounded-[8px] bg-red-500 px-4 text-xs font-semibold uppercase tracking-wider shadow-[0_4px_12px_rgba(255,0,0,0.3)] transition-all hover:bg-red-600"
+    >
+      {isMeetingOwner ? 'End call for everyone' : 'Leave Meeting'}
     </Button>
   );
 };

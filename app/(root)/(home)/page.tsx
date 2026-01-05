@@ -1,27 +1,83 @@
-import MeetingTypeList from '@/components/MeetingTypeList';
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useUser } from '@clerk/nextjs';
+import { StreamCall, StreamTheme, useStreamVideoClient } from '@stream-io/video-react-sdk';
+import { Loader } from 'lucide-react';
+
+import MeetingSetup from '@/components/MeetingSetup';
+import MeetingRoom from '@/components/MeetingRoom';
+
+// Persistent meeting room ID - all users join this room
+const PERSISTENT_MEETING_ID = 'eburon-main-room';
 
 const Home = () => {
-  const now = new Date();
+  const { isLoaded, user } = useUser();
+  const client = useStreamVideoClient();
+  const [call, setCall] = useState<any>(null);
+  const [isCallLoading, setIsCallLoading] = useState(true);
+  const [isSetupComplete, setIsSetupComplete] = useState(false);
 
-  const time = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-  const date = (new Intl.DateTimeFormat('en-US', { dateStyle: 'full' })).format(now);
+  useEffect(() => {
+    if (!client || !user) return;
+
+    const loadOrCreateCall = async () => {
+      setIsCallLoading(true);
+      try {
+        // Get or create the persistent meeting room
+        const callInstance = client.call('default', PERSISTENT_MEETING_ID);
+        
+        // Create the call if it doesn't exist, or just get it
+        await callInstance.getOrCreate({
+          data: {
+            starts_at: new Date().toISOString(),
+            custom: {
+              description: 'Eburon Persistent Meeting Room',
+            },
+          },
+        });
+        
+        setCall(callInstance);
+      } catch (error) {
+        console.error('Error loading call:', error);
+      } finally {
+        setIsCallLoading(false);
+      }
+    };
+
+    loadOrCreateCall();
+  }, [client, user]);
+
+  if (!isLoaded || isCallLoading) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center">
+        <Loader className="h-10 w-10 animate-spin text-white" />
+      </div>
+    );
+  }
+
+  if (!call) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center">
+        <p className="text-center text-xl font-medium text-white">
+          Loading meeting room...
+        </p>
+      </div>
+    );
+  }
 
   return (
-    <section className="flex size-full flex-col gap-5 text-white">
-      <div className="h-[303px] w-full rounded-[20px] bg-hero bg-cover">
-        <div className="flex h-full flex-col justify-between max-md:px-5 max-md:py-8 lg:p-11">
-          <h2 className="glassmorphism max-w-[273px] rounded py-2 text-center text-base font-normal">
-            Upcoming Meeting at: 12:30 PM
-          </h2>
-          <div className="flex flex-col gap-2">
-            <h1 className="text-4xl font-extrabold lg:text-7xl">{time}</h1>
-            <p className="text-lg font-medium text-sky-1 lg:text-2xl">{date}</p>
-          </div>
-        </div>
-      </div>
-
-      <MeetingTypeList />
-    </section>
+    <main className="h-screen w-full">
+      <StreamCall call={call}>
+        <StreamTheme>
+          {!isSetupComplete ? (
+            <MeetingSetup setIsSetupComplete={setIsSetupComplete} />
+          ) : (
+            <MeetingRoom />
+          )}
+        </StreamTheme>
+      </StreamCall>
+    </main>
   );
 };
 

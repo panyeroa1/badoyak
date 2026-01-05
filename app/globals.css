@@ -15,7 +15,7 @@
 }
 
 .str-video__speaker-layout__wrapper {
-  max-height: 700px;
+  max-height: 100vh;
 }
 
 .str-video__participant-details {
@@ -40,6 +40,20 @@
 
 .str-video__call-controls__button {
   height: 40px;
+  border-radius: 8px !important;
+  background-color: #19232d !important;
+  padding: 8px 16px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+  transition: all 0.2s ease-in-out !important;
+}
+
+.str-video__call-controls__button:hover {
+  background-color: #4c535b !important;
+}
+
+.str-video__generic-menu-button {
+  border-radius: 8px !important;
+  background-color: #19232d !important;
 }
 
 .glassmorphism {
@@ -87,6 +101,10 @@
 
   .flex-between {
     @apply flex justify-between items-center;
+  }
+
+  .premium-shadow {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4), 0 0 1px rgba(255, 255, 255, 0.1);
   }
 }
 

@@ -1,15 +1,16 @@
 'use client';
 import { useState } from 'react';
 import {
-  CallControls,
   CallParticipantsList,
   CallStatsButton,
   CallingState,
   PaginatedGridLayout,
   SpeakerLayout,
   useCallStateHooks,
+  ToggleAudioPublishingButton,
+  ToggleVideoPublishingButton,
+  ScreenShareButton,
 } from '@stream-io/video-react-sdk';
-import { useRouter, useSearchParams } from 'next/navigation';
 import { Users, LayoutList } from 'lucide-react';
 
 import {
@@ -21,14 +22,12 @@ import {
 } from './ui/dropdown-menu';
 import Loader from './Loader';
 import EndCallButton from './EndCallButton';
+import TranslatorButtons from './TranslatorButtons';
 import { cn } from '@/lib/utils';
 
 type CallLayoutType = 'grid' | 'speaker-left' | 'speaker-right';
 
-const MeetingRoom = () => {
-  const searchParams = useSearchParams();
-  const isPersonalRoom = !!searchParams.get('personal');
-  const router = useRouter();
+  const MeetingRoom = () => {
   const [layout, setLayout] = useState<CallLayoutType>('speaker-left');
   const [showParticipants, setShowParticipants] = useState(false);
   const { useCallCallingState } = useCallStateHooks();
@@ -50,54 +49,84 @@ const MeetingRoom = () => {
   };
 
   return (
-    <section className="relative h-screen w-full overflow-hidden pt-4 text-white">
-      <div className="relative flex size-full items-center justify-center">
-        <div className=" flex size-full max-w-[1000px] items-center">
-          <CallLayout />
+    <section className="relative h-screen w-full overflow-hidden text-white">
+      <div className="flex size-full">
+        {/* Main Video Area */}
+        <div className={cn("relative flex flex-1 items-center justify-center transition-all duration-300 ease-in-out", {
+          "mr-[350px]": showParticipants
+        })}>
+          <div className="size-full">
+            <CallLayout />
+          </div>
         </div>
+
+        {/* Participants Sidebar */}
         <div
-          className={cn('h-[calc(100vh-86px)] hidden ml-2', {
-            'show-block': showParticipants,
+          className={cn('fixed right-0 top-0 h-[calc(100vh-80px)] w-[350px] bg-dark-1 transition-transform duration-300 ease-in-out z-20 transform', {
+            'translate-x-0': showParticipants,
+            'translate-x-full': !showParticipants,
           })}
         >
-          <CallParticipantsList onClose={() => setShowParticipants(false)} />
+          <div className="h-full p-4">
+            <CallParticipantsList onClose={() => setShowParticipants(false)} />
+          </div>
         </div>
       </div>
-      {/* video layout and call controls */}
-      <div className="fixed bottom-0 flex w-full items-center justify-center gap-5">
-        <CallControls onLeave={() => router.push(`/`)} />
 
-        <DropdownMenu>
-          <div className="flex items-center">
-            <DropdownMenuTrigger className="cursor-pointer rounded-2xl bg-[#19232d] px-4 py-2 hover:bg-[#4c535b]  ">
+      {/* Premium Sticky Bottom Navbar */}
+      <div className="fixed bottom-0 left-0 z-30 flex h-20 w-full items-center justify-between bg-[#1c1f2e]/80 px-6 backdrop-blur-md border-t border-slate-800 shadow-[0_-4px_20px_rgba(0,0,0,0.5)]">
+        
+        {/* Left: Call Controls */}
+        <div className="flex items-center gap-3">
+          <ToggleAudioPublishingButton />
+          <ToggleVideoPublishingButton />
+          <ScreenShareButton />
+        </div>
+
+        {/* Center: Translator Buttons */}
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+          <TranslatorButtons userId="current-user" userName="Current User" />
+        </div>
+
+        {/* Right: Actions */}
+        <div className="flex items-center gap-3">
+          <CallStatsButton />
+          
+          <DropdownMenu>
+            <DropdownMenuTrigger className="cursor-pointer rounded-[8px] bg-[#19232d] px-4 py-2 shadow-[0_4px_12px_rgba(0,0,0,0.4)] transition-all hover:bg-[#4c535b]">
               <LayoutList size={20} className="text-white" />
             </DropdownMenuTrigger>
-          </div>
-          <DropdownMenuContent className="border-dark-1 bg-dark-1 text-white">
-            {['Grid', 'Speaker-Left', 'Speaker-Right'].map((item, index) => (
-              <div key={index}>
-                <DropdownMenuItem
-                  onClick={() =>
-                    setLayout(item.toLowerCase() as CallLayoutType)
-                  }
-                >
-                  {item}
-                </DropdownMenuItem>
-                <DropdownMenuSeparator className="border-dark-1" />
-              </div>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
-        <CallStatsButton />
-        <button onClick={() => setShowParticipants((prev) => !prev)}>
-          <div className=" cursor-pointer rounded-2xl bg-[#19232d] px-4 py-2 hover:bg-[#4c535b]  ">
+            <DropdownMenuContent className="border-dark-1 bg-dark-1 text-white">
+              {['Grid', 'Speaker-Left', 'Speaker-Right'].map((item, index) => (
+                <div key={index}>
+                  <DropdownMenuItem
+                    onClick={() => setLayout(item.toLowerCase() as CallLayoutType)}
+                  >
+                    {item}
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator className="border-dark-1" />
+                </div>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <button 
+            onClick={() => setShowParticipants((prev) => !prev)} 
+            title="Participants"
+            className={cn("cursor-pointer rounded-[8px] px-4 py-2 shadow-[0_4px_12px_rgba(0,0,0,0.4)] transition-all", {
+              "bg-blue-600": showParticipants,
+              "bg-[#19232d] hover:bg-[#4c535b]": !showParticipants
+            })}
+          >
             <Users size={20} className="text-white" />
-          </div>
-        </button>
-        {!isPersonalRoom && <EndCallButton />}
+          </button>
+          
+          <EndCallButton />
+        </div>
       </div>
     </section>
   );
 };
 
 export default MeetingRoom;
+
