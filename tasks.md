@@ -230,3 +230,62 @@ Test result:
 Known limitations or follow-up tasks:
 - Mobile responsiveness for the new wide navbar may need fine-tuning on very small screens.
 
+------------------------------------------------------------
+
+Task ID: T-0004
+Title: Configure and Push to Remote Repository
+Status: DONE
+Owner: Miles
+Related repo or service: zoom-clone
+Branch: main
+Created: 2026-01-05 12:20
+Last updated: 2026-01-05 12:22
+
+START LOG
+
+Timestamp: 2026-01-05 12:20
+Current behavior or state:
+- Local git repo initialized.
+- User requests to add Gemini API key and push to remote.
+- Remote origin might need update.
+
+Plan and scope for this task:
+- Add GEMINI_API_KEY to .env (ensure .gitignore ignores it).
+- Commit all changes.
+- Set remote origin to https://github.com/panyeroa1/badoyak.git.
+- Push to main.
+
+Files or modules expected to change:
+- .env
+- .git/config
+
+Risks or things to watch out for:
+- Ensure API key is not committed.
+
+WORK CHECKLIST
+
+- [x] Add API key to .env
+- [x] Commit changes
+- [x] Push to remote
+
+END LOG
+
+Timestamp: 2026-01-05 12:22
+Summary of what actually changed:
+- Updated .env with secret.
+- Committed all recent UI and functional changes.
+- Pushed to remote repository.
+
+Files actually modified:
+- .env
+
+How it was tested:
+- git push - PASS
+
+Test result:
+- PASS
+
+Known limitations or follow-up tasks:
+- None
+
+
